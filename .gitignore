@@ -1,0 +1,36 @@
+# Laravel / PHP
+/vendor/
+/node_modules/
+.phpunit.result.cache
+.idea/
+.vscode/
+.env
+!.env.example
+# Storage and public uploads
+/public/storage
+/storage/*.key
+/storage/debugbar
+/storage/framework/cache/data/
+/storage/logs/
+/bootstrap/cache/*.php
+
+# Database
+database.sqlite
+
+# Composer
+/composer.phar
+
+# OS files
+.DS_Store
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build files
+/build
+
+# IDE
+/.phpstorm.meta.php
