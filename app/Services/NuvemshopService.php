@@ -89,13 +89,75 @@ class NuvemshopService
     }
 
     /**
+     * Get a single category from Nuvemshop API
+     */
+    public function getCategory(?string $storeId, string $categoryId): array
+    {
+        try {
+            $store = $storeId 
+                ? Store::where('store_id', $storeId)->first()
+                : Store::first();
+
+            if (!$store) {
+                return [
+                    'success' => false,
+                    'message' => 'Nenhuma loja configurada. Execute a instalação primeiro.',
+                    'data' => null,
+                ];
+            }
+
+            Log::info("Buscando categoria $categoryId para store_id: " . $store->store_id);
+
+            $response = Http::withHeaders([
+                'Authentication' => 'bearer ' . $store->access_token,
+                'User-Agent' => 'Nuvemshop-Category-Description-App',
+                'Content-Type' => 'application/json',
+            ])->get(
+                $this->apiBaseUrl . '/' . $store->store_id . '/categories/' . $categoryId
+            );
+
+            if (!$response->successful()) {
+                Log::error('Erro ao buscar categoria da Nuvemshop', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                    'categoryId' => $categoryId,
+                ]);
+
+                return [
+                    'success' => false,
+                    'message' => 'Erro ao buscar categoria: ' . $response->body(),
+                    'data' => null,
+                ];
+            }
+
+            $category = $response->json();
+
+            return [
+                'success' => true,
+                'data' => $category,
+                'message' => 'Categoria obtida com sucesso',
+            ];
+        } catch (\Exception $e) {
+            Log::error('Erro ao buscar categoria: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => 'Erro ao buscar categoria: ' . $e->getMessage(),
+                'data' => null,
+            ];
+        }
+    }
+
+    /**
      * Update category description in Nuvemshop
      * Sincroniza a descrição mantendo TODOS os outros campos (name, etc)
      */
-    public function updateCategory(string $storeId, string $categoryId, string $htmlDescription): array
+    public function updateCategory(?string $storeId, string $categoryId, string $htmlDescription): array
     {
         try {
-            $store = Store::where('store_id', $storeId)->first();
+            $store = $storeId 
+                ? Store::where('store_id', $storeId)->first()
+                : Store::first();
 
             if (!$store) {
                 return [
@@ -104,7 +166,7 @@ class NuvemshopService
                 ];
             }
 
-            Log::info("Atualizando descrição da categoria $categoryId para loja $storeId");
+            Log::info("Atualizando descrição da categoria $categoryId para loja " . $store->store_id);
 
             // GET para pegar dados atuais
             $getResponse = Http::withHeaders([

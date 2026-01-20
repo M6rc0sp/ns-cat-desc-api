@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\CategoryDescription;
-use App\Models\Store;
 use App\Services\NuvemshopService;
 use Illuminate\Http\Request;
 
+/**
+ * Controller para gerenciar descrições de categorias
+ * Todas as operações são feitas diretamente na API da Nuvemshop
+ * Não utilizamos mais o banco de dados local para categorias/descrições
+ */
 class DescriptionController extends Controller
 {
     protected NuvemshopService $nuvemshopService;
@@ -17,102 +20,100 @@ class DescriptionController extends Controller
     }
 
     /**
-     * Get all descriptions with pagination
+     * Get all categories from Nuvemshop with their descriptions
      */
     public function index(Request $request)
     {
-        $perPage = $request->input('per_page', 15);
-        $page = $request->input('page', 1);
-        
-        $descriptions = CategoryDescription::paginate($perPage);
-        
-        return response()->json([
-            'success' => true,
-            'data' => $descriptions->items(),
-            'pagination' => [
-                'current_page' => $descriptions->currentPage(),
-                'total' => $descriptions->total(),
-                'per_page' => $descriptions->perPage(),
-                'last_page' => $descriptions->lastPage(),
-                'from' => $descriptions->firstItem(),
-                'to' => $descriptions->lastItem(),
-            ],
-            'message' => 'Descriptions retrieved successfully'
-        ]);
+        try {
+            $result = $this->nuvemshopService->getCategories();
+            
+            if (!$result['success']) {
+                return response()->json($result, 400);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $result['data'],
+                'message' => 'Categories retrieved successfully from Nuvemshop'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'data' => [],
+                'message' => 'Error fetching categories: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
-     * Get a specific description by ID
+     * Get a specific category by ID from Nuvemshop
      */
     public function show($id)
     {
-        $description = CategoryDescription::find($id);
+        try {
+            $result = $this->nuvemshopService->getCategory(null, $id);
 
-        if (!$description) {
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'data' => null,
+                    'message' => $result['message'] ?? 'Category not found'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $result['data'],
+                'message' => 'Category retrieved successfully from Nuvemshop'
+            ]);
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'data' => null,
-                'message' => 'Description not found'
-            ], 404);
+                'message' => 'Error fetching category: ' . $e->getMessage()
+            ], 500);
         }
-
-        return response()->json([
-            'success' => true,
-            'data' => $description,
-            'message' => 'Description retrieved successfully'
-        ]);
     }
 
     /**
-     * Get description by category ID
+     * Get category by category ID from Nuvemshop (alias for show)
      */
     public function getByCategory($categoryId)
     {
-        $description = CategoryDescription::where('category_id', $categoryId)->first();
-
-        if (!$description) {
-            return response()->json([
-                'success' => false,
-                'data' => null,
-                'message' => 'Description not found for this category'
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'data' => $description,
-            'message' => 'Description retrieved successfully'
-        ]);
+        return $this->show($categoryId);
     }
 
     /**
-     * Create a new description
+     * Create/Update category description in Nuvemshop
+     * Note: In Nuvemshop, we update the existing category with the new description
      */
     public function store(Request $request)
     {
         try {
             $this->validate($request, [
-                'category_id' => 'required|string|unique:category_descriptions',
+                'category_id' => 'required|string',
                 'content' => 'required|string',
                 'html_content' => 'required|string',
             ]);
 
-            $description = CategoryDescription::create($request->all());
+            $result = $this->nuvemshopService->updateCategory(
+                null,
+                $request->input('category_id'),
+                $request->input('html_content')
+            );
 
-            // Tenta atualizar na Nuvemshop se houver uma loja configurada
-            $store = Store::first();
-            if ($store) {
-                $this->nuvemshopService->updateCategory(
-                    $store->store_id,
-                    $description->category_id,
-                    $description->html_content
-                );
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'data' => null,
+                    'message' => $result['message'] ?? 'Error updating category description'
+                ], 400);
             }
 
             return response()->json([
                 'success' => true,
-                'data' => $description,
-                'message' => 'Description created and synced with Nuvemshop successfully'
+                'data' => $result['data'],
+                'message' => 'Description synced with Nuvemshop successfully'
             ], 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
@@ -131,42 +132,35 @@ class DescriptionController extends Controller
     }
 
     /**
-     * Update a description
+     * Update category description in Nuvemshop
+     * The $id parameter is the category_id in Nuvemshop
      */
     public function update(Request $request, $id)
     {
         try {
-            $description = CategoryDescription::find($id);
-
-            if (!$description) {
-                return response()->json([
-                    'success' => false,
-                    'data' => null,
-                    'message' => 'Description not found'
-                ], 404);
-            }
-
             $this->validate($request, [
                 'content' => 'required|string',
                 'html_content' => 'required|string',
             ]);
 
-            $description->update($request->all());
+            $result = $this->nuvemshopService->updateCategory(
+                null,
+                $id,
+                $request->input('html_content')
+            );
 
-            // Tenta atualizar na Nuvemshop se houver uma loja configurada
-            $store = Store::first();
-            if ($store) {
-                $this->nuvemshopService->updateCategory(
-                    $store->store_id,
-                    $description->category_id,
-                    $description->html_content
-                );
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'data' => null,
+                    'message' => $result['message'] ?? 'Error updating category description'
+                ], 400);
             }
 
             return response()->json([
                 'success' => true,
-                'data' => $description,
-                'message' => 'Description updated and synced with Nuvemshop successfully'
+                'data' => $result['data'],
+                'message' => 'Description synced with Nuvemshop successfully'
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
@@ -203,65 +197,84 @@ class DescriptionController extends Controller
     }
 
     /**
-     * Delete a description
+     * Delete is not applicable since descriptions are part of categories in Nuvemshop
+     * Instead, we can clear the description by setting it to empty
      */
     public function destroy($id)
     {
         try {
-            $description = CategoryDescription::find($id);
+            // Para "deletar" uma descrição, setamos como vazio na Nuvemshop
+            $result = $this->nuvemshopService->updateCategory(
+                null,
+                $id,
+                ''
+            );
 
-            if (!$description) {
+            if (!$result['success']) {
                 return response()->json([
                     'success' => false,
                     'data' => null,
-                    'message' => 'Description not found'
-                ], 404);
+                    'message' => $result['message'] ?? 'Error clearing category description'
+                ], 400);
             }
-
-            $description->delete();
 
             return response()->json([
                 'success' => true,
                 'data' => null,
-                'message' => 'Description deleted successfully'
+                'message' => 'Description cleared successfully in Nuvemshop'
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'data' => null,
-                'message' => 'Error deleting description: ' . $e->getMessage()
+                'message' => 'Error clearing description: ' . $e->getMessage()
             ], 500);
         }
     }
 
     /**
      * Get description by category ID (Public endpoint for frontend consumption)
+     * Fetches directly from Nuvemshop API
      */
     public function getCategoryDescription($categoryId)
     {
         try {
-            $description = CategoryDescription::where('category_id', $categoryId)->first();
+            $result = $this->nuvemshopService->getCategory(null, $categoryId);
 
-            if (!$description) {
+            if (!$result['success']) {
                 return response()->json([
                     'success' => false,
                     'data' => null,
-                    'message' => 'Description not found for this category',
+                    'message' => 'Category not found',
                     'category_id' => $categoryId,
                 ], 404);
+            }
+
+            $category = $result['data'];
+            
+            // Extrair descrição do objeto da categoria
+            $description = '';
+            if (isset($category['description'])) {
+                if (is_array($category['description'])) {
+                    $description = $category['description']['pt'] 
+                        ?? $category['description']['es'] 
+                        ?? $category['description']['en'] 
+                        ?? '';
+                } else {
+                    $description = $category['description'];
+                }
             }
 
             return response()->json([
                 'success' => true,
                 'data' => [
-                    'id' => $description->id,
-                    'category_id' => $description->category_id,
-                    'content' => $description->content,
-                    'html_content' => $description->html_content,
-                    'created_at' => $description->created_at,
-                    'updated_at' => $description->updated_at,
+                    'id' => $category['id'],
+                    'category_id' => $category['id'],
+                    'name' => $category['name'] ?? null,
+                    'content' => strip_tags($description),
+                    'html_content' => $description,
                 ],
-                'message' => 'Description retrieved successfully'
+                'message' => 'Description retrieved successfully from Nuvemshop'
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -274,20 +287,41 @@ class DescriptionController extends Controller
 
     /**
      * Get all descriptions organized by category (Public endpoint for bulk consumption)
+     * Fetches directly from Nuvemshop API
      */
     public function getCategoriesDescriptions()
     {
         try {
-            $descriptions = CategoryDescription::all();
+            $result = $this->nuvemshopService->getCategories();
+
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'data' => [],
+                    'message' => $result['message'] ?? 'Error fetching categories'
+                ], 400);
+            }
 
             $organized = [];
-            foreach ($descriptions as $description) {
-                $organized[$description->category_id] = [
-                    'id' => $description->id,
-                    'category_id' => $description->category_id,
-                    'content' => $description->content,
-                    'html_content' => $description->html_content,
-                    'updated_at' => $description->updated_at,
+            foreach ($result['data'] as $category) {
+                $description = '';
+                if (isset($category['description'])) {
+                    if (is_array($category['description'])) {
+                        $description = $category['description']['pt'] 
+                            ?? $category['description']['es'] 
+                            ?? $category['description']['en'] 
+                            ?? '';
+                    } else {
+                        $description = $category['description'];
+                    }
+                }
+
+                $organized[$category['id']] = [
+                    'id' => $category['id'],
+                    'category_id' => $category['id'],
+                    'name' => $category['name'] ?? null,
+                    'content' => strip_tags($description),
+                    'html_content' => $description,
                 ];
             }
 
@@ -295,7 +329,7 @@ class DescriptionController extends Controller
                 'success' => true,
                 'data' => $organized,
                 'total' => count($organized),
-                'message' => 'All descriptions retrieved successfully'
+                'message' => 'All descriptions retrieved successfully from Nuvemshop'
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -306,3 +340,4 @@ class DescriptionController extends Controller
         }
     }
 }
+

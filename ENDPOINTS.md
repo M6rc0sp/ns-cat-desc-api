@@ -2,11 +2,13 @@
 
 Estes são os endpoints públicos para consumir as descrições de categorias editadas no app.
 
+> **Importante:** Todas as operações de categorias e descrições são feitas diretamente na API da Nuvemshop. Não utilizamos banco de dados local para armazenar categorias ou descrições - apenas o token de acesso da loja é salvo localmente para autenticação.
+
 ## 1. Get Description by Category ID
 
 **Endpoint:** `GET /public/descriptions/{categoryId}`
 
-**Descrição:** Retorna a descrição de uma categoria específica
+**Descrição:** Retorna a descrição de uma categoria específica diretamente da Nuvemshop
 
 **Exemplo:**
 ```bash
@@ -18,14 +20,17 @@ curl http://localhost:8000/public/descriptions/36162523
 {
   "success": true,
   "data": {
-    "id": 1,
-    "category_id": "36162523",
+    "id": 36162523,
+    "category_id": 36162523,
+    "name": {
+      "pt": "Nome da Categoria",
+      "es": "Nombre de la Categoría",
+      "en": "Category Name"
+    },
     "content": "Descrição em texto plano da categoria",
-    "html_content": "{\"root\":{\"children\":[...],\"direction\":null,\"format\":\"\",\"indent\":0,\"type\":\"root\",\"version\":1}}",
-    "created_at": "2024-01-14T10:30:00Z",
-    "updated_at": "2024-01-14T10:30:00Z"
+    "html_content": "<p>Descrição HTML da categoria</p>"
   },
-  "message": "Description retrieved successfully"
+  "message": "Description retrieved successfully from Nuvemshop"
 }
 ```
 
@@ -45,7 +50,7 @@ curl http://localhost:8000/public/descriptions/36162523
 
 **Endpoint:** `GET /public/descriptions`
 
-**Descrição:** Retorna todas as descrições organizadas por category_id
+**Descrição:** Retorna todas as categorias com suas descrições diretamente da Nuvemshop, organizadas por category_id
 
 **Exemplo:**
 ```bash
@@ -58,22 +63,26 @@ curl http://localhost:8000/public/descriptions
   "success": true,
   "data": {
     "36162523": {
-      "id": 1,
-      "category_id": "36162523",
+      "id": 36162523,
+      "category_id": 36162523,
+      "name": {
+        "pt": "Categoria 1"
+      },
       "content": "Descrição da categoria 1",
-      "html_content": "{...}",
-      "updated_at": "2024-01-14T10:30:00Z"
+      "html_content": "<p>Descrição HTML</p>"
     },
     "36162524": {
-      "id": 2,
-      "category_id": "36162524",
+      "id": 36162524,
+      "category_id": 36162524,
+      "name": {
+        "pt": "Categoria 2"
+      },
       "content": "Descrição da categoria 2",
-      "html_content": "{...}",
-      "updated_at": "2024-01-14T10:35:00Z"
+      "html_content": "<p>Descrição HTML</p>"
     }
   },
   "total": 2,
-  "message": "All descriptions retrieved successfully"
+  "message": "All descriptions retrieved successfully from Nuvemshop"
 }
 ```
 
