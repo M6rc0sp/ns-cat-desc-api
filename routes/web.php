@@ -21,7 +21,8 @@ $router->group(['prefix' => 'api'], function () use ($router) {
     // Rota pública de instalação do app Nuvemshop
     $router->get('/ns/install', 'NuvemshopController@install');
 
-    $router->group(['prefix' => 'descriptions'], function () use ($router) {
+    // Rotas protegidas pelo middleware Nexo (requer autenticação via token JWT)
+    $router->group(['prefix' => 'descriptions', 'middleware' => 'nexo.auth'], function () use ($router) {
         $router->get('/', 'DescriptionController@index');
         $router->get('/categories', 'DescriptionController@getCategories');
         $router->post('/', 'DescriptionController@store');
@@ -33,7 +34,8 @@ $router->group(['prefix' => 'api'], function () use ($router) {
 });
 
 // Rotas públicas para consumir descrições (para frontend ou widgets)
+// Estas rotas requerem o store_id como parâmetro na URL
 $router->group(['prefix' => 'public'], function () use ($router) {
-    $router->get('/descriptions/{categoryId}', 'DescriptionController@getCategoryDescription');
-    $router->get('/descriptions', 'DescriptionController@getCategoriesDescriptions');
+    $router->get('/descriptions/{storeId}/{categoryId}', 'DescriptionController@getCategoryDescription');
+    $router->get('/descriptions/{storeId}', 'DescriptionController@getCategoriesDescriptions');
 });

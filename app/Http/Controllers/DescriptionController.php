@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 /**
  * Controller para gerenciar descrições de categorias
  * Todas as operações são feitas diretamente na API da Nuvemshop
- * Não utilizamos mais o banco de dados local para categorias/descrições
+ * O store_id é extraído do token JWT pelo middleware NexoApiAuth
  */
 class DescriptionController extends Controller
 {
@@ -21,12 +21,23 @@ class DescriptionController extends Controller
     }
 
     /**
+     * Helper para obter o store_id do request (injetado pelo middleware)
+     */
+    private function getStoreId(Request $request): ?string
+    {
+        return $request->attributes->get('store_id') ?? $request->input('auth_store_id');
+    }
+
+    /**
      * Get all categories from Nuvemshop with their descriptions
      */
     public function index(Request $request)
     {
         try {
-            $result = $this->nuvemshopService->getCategories();
+            $storeId = $this->getStoreId($request);
+            Log::info("DescriptionController@index - store_id: {$storeId}");
+            
+            $result = $this->nuvemshopService->getCategories($storeId);
             
             if (!$result['success']) {
                 return response()->json($result, 400);
@@ -49,10 +60,11 @@ class DescriptionController extends Controller
     /**
      * Get a specific category by ID from Nuvemshop
      */
-    public function show($id)
+    public function show(Request $request, $id)
     {
         try {
-            $result = $this->nuvemshopService->getCategory(null, $id);
+            $storeId = $this->getStoreId($request);
+            $result = $this->nuvemshopService->getCategory($storeId, $id);
 
             if (!$result['success']) {
                 return response()->json([
@@ -80,10 +92,13 @@ class DescriptionController extends Controller
      * Get category by category ID from Nuvemshop
      * Returns data in the format expected by the frontend
      */
-    public function getByCategory($categoryId)
+    public function getByCategory(Request $request, $categoryId)
     {
         try {
-            $result = $this->nuvemshopService->getCategory(null, $categoryId);
+            $storeId = $this->getStoreId($request);
+            Log::info("DescriptionController@getByCategory - store_id: {$storeId}, category_id: {$categoryId}");
+            
+            $result = $this->nuvemshopService->getCategory($storeId, $categoryId);
 
             if (!$result['success']) {
                 return response()->json([
@@ -142,8 +157,11 @@ class DescriptionController extends Controller
                 'html_content' => 'required|string',
             ]);
 
+            $storeId = $this->getStoreId($request);
+            Log::info("DescriptionController@store - store_id: {$storeId}");
+
             $result = $this->nuvemshopService->updateCategory(
-                null,
+                $storeId,
                 $request->input('category_id'),
                 $request->input('html_content')
             );
@@ -189,8 +207,11 @@ class DescriptionController extends Controller
                 'html_content' => 'required|string',
             ]);
 
+            $storeId = $this->getStoreId($request);
+            Log::info("DescriptionController@update - store_id: {$storeId}, category_id: {$id}");
+
             $result = $this->nuvemshopService->updateCategory(
-                null,
+                $storeId,
                 $id,
                 $request->input('html_content')
             );
@@ -227,10 +248,13 @@ class DescriptionController extends Controller
     /**
      * Get all categories from Nuvemshop
      */
-    public function getCategories()
+    public function getCategories(Request $request)
     {
         try {
-            $result = $this->nuvemshopService->getCategories();
+            $storeId = $this->getStoreId($request);
+            Log::info("DescriptionController@getCategories - store_id: {$storeId}");
+            
+            $result = $this->nuvemshopService->getCategories($storeId);
             
             return response()->json($result, $result['success'] ? 200 : 400);
         } catch (\Exception $e) {
@@ -246,12 +270,15 @@ class DescriptionController extends Controller
      * Delete is not applicable since descriptions are part of categories in Nuvemshop
      * Instead, we can clear the description by setting it to empty
      */
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         try {
+            $storeId = $this->getStoreId($request);
+            Log::info("DescriptionController@destroy - store_id: {$storeId}, category_id: {$id}");
+            
             // Para "deletar" uma descrição, setamos como vazio na Nuvemshop
             $result = $this->nuvemshopService->updateCategory(
-                null,
+                $storeId,
                 $id,
                 ''
             );
@@ -281,11 +308,14 @@ class DescriptionController extends Controller
     /**
      * Get description by category ID (Public endpoint for frontend consumption)
      * Fetches directly from Nuvemshop API
+     * Requer storeId na URL pois é endpoint público (sem autenticação JWT)
      */
-    public function getCategoryDescription($categoryId)
+    public function getCategoryDescription($storeId, $categoryId)
     {
         try {
-            $result = $this->nuvemshopService->getCategory(null, $categoryId);
+            Log::info("DescriptionController@getCategoryDescription (public) - store_id: {$storeId}, category_id: {$categoryId}");
+            
+            $result = $this->nuvemshopService->getCategory($storeId, $categoryId);
 
             if (!$result['success']) {
                 return response()->json([
@@ -334,11 +364,14 @@ class DescriptionController extends Controller
     /**
      * Get all descriptions organized by category (Public endpoint for bulk consumption)
      * Fetches directly from Nuvemshop API
+     * Requer storeId na URL pois é endpoint público (sem autenticação JWT)
      */
-    public function getCategoriesDescriptions()
+    public function getCategoriesDescriptions($storeId)
     {
         try {
-            $result = $this->nuvemshopService->getCategories();
+            Log::info("DescriptionController@getCategoriesDescriptions (public) - store_id: {$storeId}");
+            
+            $result = $this->nuvemshopService->getCategories($storeId);
 
             if (!$result['success']) {
                 return response()->json([
