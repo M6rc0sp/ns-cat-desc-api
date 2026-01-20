@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\NuvemshopService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Controller para gerenciar descrições de categorias
@@ -76,11 +77,56 @@ class DescriptionController extends Controller
     }
 
     /**
-     * Get category by category ID from Nuvemshop (alias for show)
+     * Get category by category ID from Nuvemshop
+     * Returns data in the format expected by the frontend
      */
     public function getByCategory($categoryId)
     {
-        return $this->show($categoryId);
+        try {
+            $result = $this->nuvemshopService->getCategory(null, $categoryId);
+
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'data' => null,
+                    'message' => $result['message'] ?? 'Category not found'
+                ], 404);
+            }
+
+            $category = $result['data'];
+            
+            // Extrair descrição do objeto da categoria (formato i18n da Nuvemshop)
+            $description = '';
+            if (isset($category['description'])) {
+                if (is_array($category['description'])) {
+                    $description = $category['description']['pt'] 
+                        ?? $category['description']['es'] 
+                        ?? $category['description']['en'] 
+                        ?? '';
+                } else {
+                    $description = $category['description'];
+                }
+            }
+
+            // Retornar no formato esperado pelo frontend
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'id' => $category['id'],
+                    'category_id' => $category['id'],
+                    'name' => $category['name'] ?? null,
+                    'content' => strip_tags($description),
+                    'html_content' => $description,
+                ],
+                'message' => 'Category retrieved successfully from Nuvemshop'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'message' => 'Error fetching category: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
