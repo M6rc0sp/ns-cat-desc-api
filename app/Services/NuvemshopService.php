@@ -225,6 +225,8 @@ class NuvemshopService
                 ];
             }
 
+            Log::info('Token recebido com sucesso: '.substr($data['access_token'], 0, 10).'...');
+
             // Armazenar tokens na tabela stores
             $storeId = $data['user_id'] ?? $data['store_id'] ?? null;
             if (!$storeId) {
@@ -248,7 +250,7 @@ class NuvemshopService
                 ]
             );
 
-            Log::info('Token recebido e armazenado com sucesso para store: '.$storeId);
+            Log::info("Loja {$storeId} salva/atualizada com sucesso");
 
             return [
                 'success' => true,
