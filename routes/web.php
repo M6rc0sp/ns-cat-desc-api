@@ -31,11 +31,11 @@ $router->group(['prefix' => 'api'], function () use ($router) {
         $router->put('/{id}', 'DescriptionController@update');
         $router->delete('/{id}', 'DescriptionController@destroy');
     });
-});
 
-// Rotas públicas para consumir descrições (para frontend ou widgets)
-// Estas rotas requerem o store_id como parâmetro na URL
-$router->group(['prefix' => 'public'], function () use ($router) {
-    $router->get('/descriptions/{storeId}/{categoryId}', 'DescriptionController@getCategoryDescription');
-    $router->get('/descriptions/{storeId}', 'DescriptionController@getCategoriesDescriptions');
+    // Rotas públicas para consumir descrições (para frontend ou widgets)
+    // Estas rotas requerem o store_id como parâmetro na URL
+    $router->group(['prefix' => 'public'], function () use ($router) {
+        $router->get('/descriptions/{storeId}/{categoryId}', 'DescriptionController@getCategoryDescription');
+        $router->get('/descriptions/{storeId}', 'DescriptionController@getCategoriesDescriptions');
+    });
 });
