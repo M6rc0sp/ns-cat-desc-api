@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CategoryDescription;
 use App\Services\NuvemshopService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -89,7 +90,7 @@ class DescriptionController extends Controller
     }
 
     /**
-     * Get category by category ID from Nuvemshop
+     * Get category by category ID from local database or Nuvemshop
      * Returns data in the format expected by the frontend
      */
     public function getByCategory(Request $request, $categoryId)
@@ -98,6 +99,23 @@ class DescriptionController extends Controller
             $storeId = $this->getStoreId($request);
             Log::info("DescriptionController@getByCategory - store_id: {$storeId}, category_id: {$categoryId}");
             
+            // Verificar se existe descrição local
+            $localDescription = CategoryDescription::where('category_id', $categoryId)->first();
+            if ($localDescription) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'id' => $localDescription->id,
+                        'category_id' => $localDescription->category_id,
+                        'name' => null,
+                        'content' => $localDescription->content,
+                        'html_content' => $localDescription->html_content,
+                    ],
+                    'message' => 'Category retrieved successfully from local database'
+                ]);
+            }
+            
+            // Se não encontrar localmente, buscar na Nuvemshop
             $result = $this->nuvemshopService->getCategory($storeId, $categoryId);
 
             if (!$result['success']) {
@@ -145,8 +163,8 @@ class DescriptionController extends Controller
     }
 
     /**
-     * Create/Update category description in Nuvemshop
-     * Note: In Nuvemshop, we update the existing category with the new description
+     * Create/Update category description in local database
+     * No longer syncs with Nuvemshop API, only saves locally
      */
     public function store(Request $request)
     {
@@ -160,24 +178,18 @@ class DescriptionController extends Controller
             $storeId = $this->getStoreId($request);
             Log::info("DescriptionController@store - store_id: {$storeId}");
 
-            $result = $this->nuvemshopService->updateCategory(
-                $storeId,
-                $request->input('category_id'),
-                $request->input('html_content')
+            $categoryDescription = CategoryDescription::updateOrCreate(
+                ['category_id' => $request->input('category_id')],
+                [
+                    'content' => $request->input('content'),
+                    'html_content' => $request->input('html_content'),
+                ]
             );
-
-            if (!$result['success']) {
-                return response()->json([
-                    'success' => false,
-                    'data' => null,
-                    'message' => $result['message'] ?? 'Error updating category description'
-                ], 400);
-            }
 
             return response()->json([
                 'success' => true,
-                'data' => $result['data'],
-                'message' => 'Description synced with Nuvemshop successfully'
+                'data' => $categoryDescription->toArray(),
+                'message' => 'Description saved successfully in local database'
             ], 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
@@ -196,8 +208,9 @@ class DescriptionController extends Controller
     }
 
     /**
-     * Update category description in Nuvemshop
-     * The $id parameter is the category_id in Nuvemshop
+     * Update category description in local database
+     * No longer syncs with Nuvemshop API, only saves locally
+     * The $id parameter is the category_id
      */
     public function update(Request $request, $id)
     {
@@ -210,24 +223,18 @@ class DescriptionController extends Controller
             $storeId = $this->getStoreId($request);
             Log::info("DescriptionController@update - store_id: {$storeId}, category_id: {$id}");
 
-            $result = $this->nuvemshopService->updateCategory(
-                $storeId,
-                $id,
-                $request->input('html_content')
+            $categoryDescription = CategoryDescription::updateOrCreate(
+                ['category_id' => $id],
+                [
+                    'content' => $request->input('content'),
+                    'html_content' => $request->input('html_content'),
+                ]
             );
-
-            if (!$result['success']) {
-                return response()->json([
-                    'success' => false,
-                    'data' => null,
-                    'message' => $result['message'] ?? 'Error updating category description'
-                ], 400);
-            }
 
             return response()->json([
                 'success' => true,
-                'data' => $result['data'],
-                'message' => 'Description synced with Nuvemshop successfully'
+                'data' => $categoryDescription->toArray(),
+                'message' => 'Description saved successfully in local database'
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
@@ -267,8 +274,7 @@ class DescriptionController extends Controller
     }
 
     /**
-     * Delete is not applicable since descriptions are part of categories in Nuvemshop
-     * Instead, we can clear the description by setting it to empty
+     * Delete category description from local database
      */
     public function destroy(Request $request, $id)
     {
@@ -276,38 +282,35 @@ class DescriptionController extends Controller
             $storeId = $this->getStoreId($request);
             Log::info("DescriptionController@destroy - store_id: {$storeId}, category_id: {$id}");
             
-            // Para "deletar" uma descrição, setamos como vazio na Nuvemshop
-            $result = $this->nuvemshopService->updateCategory(
-                $storeId,
-                $id,
-                ''
-            );
+            $categoryDescription = CategoryDescription::where('category_id', $id)->first();
 
-            if (!$result['success']) {
+            if (!$categoryDescription) {
                 return response()->json([
                     'success' => false,
                     'data' => null,
-                    'message' => $result['message'] ?? 'Error clearing category description'
-                ], 400);
+                    'message' => 'Description not found'
+                ], 404);
             }
+
+            $categoryDescription->delete();
 
             return response()->json([
                 'success' => true,
                 'data' => null,
-                'message' => 'Description cleared successfully in Nuvemshop'
+                'message' => 'Description deleted successfully from local database'
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'data' => null,
-                'message' => 'Error clearing description: ' . $e->getMessage()
+                'message' => 'Error deleting description: ' . $e->getMessage()
             ], 500);
         }
     }
 
     /**
      * Get description by category ID (Public endpoint for frontend consumption)
-     * Fetches directly from Nuvemshop API
+     * Fetches from local database first, falls back to Nuvemshop API if not found locally
      * Requer storeId na URL pois é endpoint público (sem autenticação JWT)
      */
     public function getCategoryDescription($storeId, $categoryId)
@@ -315,6 +318,23 @@ class DescriptionController extends Controller
         try {
             Log::info("DescriptionController@getCategoryDescription (public) - store_id: {$storeId}, category_id: {$categoryId}");
             
+            // Verificar se existe descrição local
+            $localDescription = CategoryDescription::where('category_id', $categoryId)->first();
+            if ($localDescription) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'id' => $localDescription->id,
+                        'category_id' => $localDescription->category_id,
+                        'name' => null,
+                        'content' => $localDescription->content,
+                        'html_content' => $localDescription->html_content,
+                    ],
+                    'message' => 'Description retrieved successfully from local database'
+                ]);
+            }
+            
+            // Se não encontrar localmente, buscar na Nuvemshop
             $result = $this->nuvemshopService->getCategory($storeId, $categoryId);
 
             if (!$result['success']) {
@@ -363,7 +383,7 @@ class DescriptionController extends Controller
 
     /**
      * Get all descriptions organized by category (Public endpoint for bulk consumption)
-     * Fetches directly from Nuvemshop API
+     * Fetches local descriptions, combined with Nuvemshop categories
      * Requer storeId na URL pois é endpoint público (sem autenticação JWT)
      */
     public function getCategoriesDescriptions($storeId)
@@ -371,44 +391,77 @@ class DescriptionController extends Controller
         try {
             Log::info("DescriptionController@getCategoriesDescriptions (public) - store_id: {$storeId}");
             
+            // Buscar todas as descrições locais
+            $localDescriptions = CategoryDescription::all()->keyBy('category_id');
+            
+            // Buscar categorias da Nuvemshop
             $result = $this->nuvemshopService->getCategories($storeId);
 
             if (!$result['success']) {
+                // Se não conseguir da Nuvemshop, retornar apenas as locais
+                $organized = [];
+                foreach ($localDescriptions as $desc) {
+                    $organized[$desc->category_id] = [
+                        'id' => $desc->id,
+                        'category_id' => $desc->category_id,
+                        'name' => null,
+                        'content' => $desc->content,
+                        'html_content' => $desc->html_content,
+                    ];
+                }
+                
                 return response()->json([
-                    'success' => false,
-                    'data' => [],
-                    'message' => $result['message'] ?? 'Error fetching categories'
-                ], 400);
+                    'success' => true,
+                    'data' => $organized,
+                    'total' => count($organized),
+                    'message' => 'Descriptions retrieved from local database only'
+                ]);
             }
 
+            // Mesclar dados da Nuvemshop com descrições locais
             $organized = [];
             foreach ($result['data'] as $category) {
-                $description = '';
-                if (isset($category['description'])) {
-                    if (is_array($category['description'])) {
-                        $description = $category['description']['pt'] 
-                            ?? $category['description']['es'] 
-                            ?? $category['description']['en'] 
-                            ?? '';
-                    } else {
-                        $description = $category['description'];
+                $categoryId = $category['id'];
+                
+                // Se existe descrição local, usar ela
+                if (isset($localDescriptions[$categoryId])) {
+                    $desc = $localDescriptions[$categoryId];
+                    $organized[$categoryId] = [
+                        'id' => $desc->id,
+                        'category_id' => $desc->category_id,
+                        'name' => $category['name'] ?? null,
+                        'content' => $desc->content,
+                        'html_content' => $desc->html_content,
+                    ];
+                } else {
+                    // Senão, usar descrição da Nuvemshop
+                    $description = '';
+                    if (isset($category['description'])) {
+                        if (is_array($category['description'])) {
+                            $description = $category['description']['pt'] 
+                                ?? $category['description']['es'] 
+                                ?? $category['description']['en'] 
+                                ?? '';
+                        } else {
+                            $description = $category['description'];
+                        }
                     }
-                }
 
-                $organized[$category['id']] = [
-                    'id' => $category['id'],
-                    'category_id' => $category['id'],
-                    'name' => $category['name'] ?? null,
-                    'content' => strip_tags($description),
-                    'html_content' => $description,
-                ];
+                    $organized[$categoryId] = [
+                        'id' => $category['id'],
+                        'category_id' => $category['id'],
+                        'name' => $category['name'] ?? null,
+                        'content' => strip_tags($description),
+                        'html_content' => $description,
+                    ];
+                }
             }
 
             return response()->json([
                 'success' => true,
                 'data' => $organized,
                 'total' => count($organized),
-                'message' => 'All descriptions retrieved successfully from Nuvemshop'
+                'message' => 'All descriptions retrieved (local and Nuvemshop)'
             ]);
         } catch (\Exception $e) {
             return response()->json([

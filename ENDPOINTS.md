@@ -2,20 +2,35 @@
 
 Estes são os endpoints públicos para consumir as descrições de categorias editadas no app.
 
-> **Importante:** Todas as operações de categorias e descrições são feitas diretamente na API da Nuvemshop. Não utilizamos banco de dados local para armazenar categorias ou descrições - apenas o token de acesso da loja é salvo localmente para autenticação.
+> **Importante:** As descrições de categorias são salvas **localmente no banco de dados da API**. Quando você edita uma descrição, ela é armazenada apenas em nossa base de dados e não é sincronizada com a API da Nuvemshop. Os dados de autenticação (token de acesso) são mantidos apenas para leitura de informações gerais das categorias.
 
 ## 1. Get Description by Category ID
 
 **Endpoint:** `GET /public/descriptions/{categoryId}`
 
-**Descrição:** Retorna a descrição de uma categoria específica diretamente da Nuvemshop
+**Descrição:** Retorna a descrição de uma categoria específica. Busca primeiro no banco de dados local e, se não encontrar, busca as informações da categoria em Nuvemshop.
 
 **Exemplo:**
 ```bash
 curl http://localhost:8000/public/descriptions/36162523
 ```
 
-**Response (200 OK):**
+**Response (200 OK - Local Database):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "category_id": "36162523",
+    "name": null,
+    "content": "Descrição em texto plano da categoria",
+    "html_content": "<p>Descrição HTML da categoria</p>"
+  },
+  "message": "Description retrieved successfully from local database"
+}
+```
+
+**Response (200 OK - Nuvemshop):**
 ```json
 {
   "success": true,
@@ -39,7 +54,7 @@ curl http://localhost:8000/public/descriptions/36162523
 {
   "success": false,
   "data": null,
-  "message": "Description not found for this category",
+  "message": "Category not found",
   "category_id": "36162523"
 }
 ```
@@ -50,7 +65,7 @@ curl http://localhost:8000/public/descriptions/36162523
 
 **Endpoint:** `GET /public/descriptions`
 
-**Descrição:** Retorna todas as categorias com suas descrições diretamente da Nuvemshop, organizadas por category_id
+**Descrição:** Retorna todas as categorias com suas descrições. Combina descrições do banco de dados local com informações de categorias da Nuvemshop, priorizando as descrições locais quando disponíveis.
 
 **Exemplo:**
 ```bash
@@ -63,26 +78,22 @@ curl http://localhost:8000/public/descriptions
   "success": true,
   "data": {
     "36162523": {
-      "id": 36162523,
-      "category_id": 36162523,
-      "name": {
-        "pt": "Categoria 1"
-      },
-      "content": "Descrição da categoria 1",
+      "id": 1,
+      "category_id": "36162523",
+      "name": "Categoria 1",
+      "content": "Descrição da categoria 1 (salva localmente)",
       "html_content": "<p>Descrição HTML</p>"
     },
     "36162524": {
       "id": 36162524,
-      "category_id": 36162524,
-      "name": {
-        "pt": "Categoria 2"
-      },
-      "content": "Descrição da categoria 2",
-      "html_content": "<p>Descrição HTML</p>"
+      "category_id": "36162524",
+      "name": "Categoria 2",
+      "content": "Descrição padrão da Nuvemshop",
+      "html_content": "<p>Descrição padrão</p>"
     }
   },
   "total": 2,
-  "message": "All descriptions retrieved successfully from Nuvemshop"
+  "message": "All descriptions retrieved (local and Nuvemshop)"
 }
 ```
 
