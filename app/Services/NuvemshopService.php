@@ -248,6 +248,138 @@ class NuvemshopService
     }
 
     /**
+     * Save or update a metafield for a category
+     * Creates a new metafield if it doesn't exist, updates if it does
+     */
+    public function saveMetafield(?string $storeId, string $categoryId, string $htmlDescription): array
+    {
+        try {
+            $store = $storeId 
+                ? Store::where('store_id', $storeId)->first()
+                : Store::first();
+
+            if (!$store) {
+                return [
+                    'success' => false,
+                    'message' => 'Loja não encontrada.',
+                ];
+            }
+
+            $metafieldKey = 'description';
+            $metafieldNamespace = 'nexos_app';
+
+            Log::info("Salvando metafield para categoria $categoryId na loja " . $store->store_id);
+
+            // Primeiro, tentar buscar metafield existente
+            $getResponse = Http::withHeaders([
+                'Authentication' => 'bearer ' . $store->access_token,
+                'User-Agent' => 'Nuvemshop-Category-Description-App',
+                'Content-Type' => 'application/json',
+            ])->get(
+                $this->apiBaseUrl . '/' . $store->store_id . '/metafields/categories',
+                [
+                    'owner_id' => $categoryId,
+                    'namespace' => $metafieldNamespace,
+                    'key' => $metafieldKey,
+                ]
+            );
+
+            $existingMetafield = null;
+            if ($getResponse->successful()) {
+                $metafields = $getResponse->json();
+                if (!empty($metafields)) {
+                    $existingMetafield = $metafields[0];
+                    Log::info("Metafield existente encontrado", ['id' => $existingMetafield['id']]);
+                }
+            }
+
+            // Se existe, fazer UPDATE
+            if ($existingMetafield) {
+                $updatePayload = [
+                    'value' => $htmlDescription,
+                    'description' => 'Descrição da categoria salva via Nexos App',
+                ];
+
+                $putResponse = Http::withHeaders([
+                    'Authentication' => 'bearer ' . $store->access_token,
+                    'User-Agent' => 'Nuvemshop-Category-Description-App',
+                    'Content-Type' => 'application/json',
+                ])->put(
+                    $this->apiBaseUrl . '/metafields/' . $existingMetafield['id'],
+                    $updatePayload
+                );
+
+                if (!$putResponse->successful()) {
+                    Log::error('Erro ao atualizar metafield', [
+                        'status' => $putResponse->status(),
+                        'body' => $putResponse->body(),
+                    ]);
+
+                    return [
+                        'success' => false,
+                        'message' => 'Erro ao atualizar metafield: ' . $putResponse->body(),
+                    ];
+                }
+
+                Log::info("Metafield atualizado com sucesso", ['id' => $existingMetafield['id']]);
+
+                return [
+                    'success' => true,
+                    'data' => $putResponse->json(),
+                    'message' => 'Metafield atualizado com sucesso',
+                ];
+            }
+
+            // Se não existe, fazer POST (CREATE)
+            $createPayload = [
+                'key' => $metafieldKey,
+                'value' => $htmlDescription,
+                'namespace' => $metafieldNamespace,
+                'description' => 'Descrição da categoria salva via Nexos App',
+                'owner_id' => $categoryId,
+                'owner_resource' => 'Category',
+            ];
+
+            $postResponse = Http::withHeaders([
+                'Authentication' => 'bearer ' . $store->access_token,
+                'User-Agent' => 'Nuvemshop-Category-Description-App',
+                'Content-Type' => 'application/json',
+            ])->post(
+                $this->apiBaseUrl . '/metafields',
+                $createPayload
+            );
+
+            if (!$postResponse->successful()) {
+                Log::error('Erro ao criar metafield', [
+                    'status' => $postResponse->status(),
+                    'body' => $postResponse->body(),
+                    'payload' => $createPayload,
+                ]);
+
+                return [
+                    'success' => false,
+                    'message' => 'Erro ao criar metafield: ' . $postResponse->body(),
+                ];
+            }
+
+            Log::info("Metafield criado com sucesso para categoria $categoryId");
+
+            return [
+                'success' => true,
+                'data' => $postResponse->json(),
+                'message' => 'Metafield criado com sucesso',
+            ];
+        } catch (\Exception $e) {
+            Log::error('Erro ao salvar metafield: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => 'Erro ao salvar metafield: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
      * Authorize app installation with Nuvemshop
      */
     public function authorize(string $code): array

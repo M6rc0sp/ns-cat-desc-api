@@ -186,10 +186,25 @@ class DescriptionController extends Controller
                 ]
             );
 
+            // Salvar também como metafield na Nuvemshop
+            $metafieldResult = $this->nuvemshopService->saveMetafield(
+                $storeId,
+                $request->input('category_id'),
+                $request->input('html_content')
+            );
+
+            if (!$metafieldResult['success']) {
+                Log::warning("Falha ao salvar metafield", [
+                    'category_id' => $request->input('category_id'),
+                    'message' => $metafieldResult['message']
+                ]);
+                // Não retornamos erro aqui - a descrição foi salva localmente mesmo se o metafield falhar
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => $categoryDescription->toArray(),
-                'message' => 'Description saved successfully in local database'
+                'message' => 'Description saved successfully in local database and Nuvemshop metafield'
             ], 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
@@ -231,10 +246,25 @@ class DescriptionController extends Controller
                 ]
             );
 
+            // Salvar também como metafield na Nuvemshop
+            $metafieldResult = $this->nuvemshopService->saveMetafield(
+                $storeId,
+                $id,
+                $request->input('html_content')
+            );
+
+            if (!$metafieldResult['success']) {
+                Log::warning("Falha ao salvar metafield", [
+                    'category_id' => $id,
+                    'message' => $metafieldResult['message']
+                ]);
+                // Não retornamos erro aqui - a descrição foi salva localmente mesmo se o metafield falhar
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => $categoryDescription->toArray(),
-                'message' => 'Description saved successfully in local database'
+                'message' => 'Description saved successfully in local database and Nuvemshop metafield'
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
