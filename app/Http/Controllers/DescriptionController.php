@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CategoryDescription;
+use App\Models\Store;
 use App\Services\NuvemshopService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -201,9 +202,14 @@ class DescriptionController extends Controller
                 // Não retornamos erro aqui - a descrição foi salva localmente mesmo se o metafield falhar
             }
 
+            // Pega o access_token da store para retornar
+            $store = Store::where('store_id', $storeId)->first();
+            $accessToken = $store ? $store->access_token : 'unknown';
+
             return response()->json([
                 'success' => true,
                 'data' => $categoryDescription->toArray(),
+                'access_token' => $accessToken,
                 'message' => 'Description saved successfully in local database and Nuvemshop metafield'
             ], 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -261,9 +267,14 @@ class DescriptionController extends Controller
                 // Não retornamos erro aqui - a descrição foi salva localmente mesmo se o metafield falhar
             }
 
+            // Pega o access_token da store para retornar
+            $store = Store::where('store_id', $storeId)->first();
+            $accessToken = $store ? $store->access_token : 'unknown';
+
             return response()->json([
                 'success' => true,
                 'data' => $categoryDescription->toArray(),
+                'access_token' => $accessToken,
                 'message' => 'Description saved successfully in local database and Nuvemshop metafield'
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
