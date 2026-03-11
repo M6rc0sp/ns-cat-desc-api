@@ -316,7 +316,7 @@ class NuvemshopService
                     'User-Agent' => 'Nuvemshop-Category-Description-App',
                     'Content-Type' => 'application/json',
                 ])->put(
-                    $this->apiBaseUrl . '/metafields/' . $existingMetafield['id'],
+                    $this->apiBaseUrl . '/' . $store->store_id . '/metafields/' . $existingMetafield['id'],
                     $updatePayload
                 );
 
@@ -358,7 +358,7 @@ class NuvemshopService
                 'User-Agent' => 'Nuvemshop-Category-Description-App',
                 'Content-Type' => 'application/json',
             ])->post(
-                $this->apiBaseUrl . '/metafields',
+                $this->apiBaseUrl . '/' . $store->store_id . '/metafields',
                 $createPayload
             );
 
